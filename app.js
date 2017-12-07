@@ -33,25 +33,35 @@ const requestConf = {
 	config: {
 		encoding: 'LINEAR16',
 		sampleRateHertz: 16000,
-		languageCode: 'ja-JP',
-	},
-	interimResults: false,
+		languageCode: 'ja-jp',
+	}
 };
+// const request = {
+// 	config: {
+// 		encoding: 'LINEAR16',
+// 		sampleRateHertz: 16000,
+// 		languageCode: 'en-US',
+// 	},
+// 	interimResults: false, // If you want interim results, set this to true
+// };
 
+// const fs = require('fs');
+// let fileStem = fs.createReadStream('./audio.raw').on('error', console.error);
+// fileStem.pipe(recognizeConnections);
 
-const recognizeConnections = {};
+let recognizeConnections;
 wsServer.on('request', (request) => {
 	if (request.remoteAddress) {
-		console.log("client created");
+		console.log("client created: " + request.remoteAddress);
 		const client = new speech.SpeechClient(auth);
-		recognizeConnections.remoteAddress = client
+		recognizeConnections = client
 			.streamingRecognize(requestConf)
-			.on('error', error => console.error(error))
+			.on('error', error => console.log(error))
 			.on('data', data => {
-				console.log("received data");
+				console.log("received recognize data");
 				console.log(data);
+				console.log(`Transcription: ${data.results[0].alternatives[0].transcript}`);
 			});
-		recognizeConnections.remoteAddress.write();
 	} else {
 		request.reject();
 	}
@@ -66,22 +76,21 @@ wsServer.on('request', (request) => {
 	//サブプロトコル
 	const connection = request.accept('recognize', request.origin);
 	connection.on('message', (message) => {
-		if (message.type === ' utf8') {
-			console.log('Received utf8 Message of ' + message.utf8Data);
-			if (message.utf8Data === 'stopRecognize') {
-				console.log('Stop recognize');
-				recognizeConnections.remoteAddress.end();
-			}
+		if (message.type === 'utf8') {
+			console.log(`received: ${message.utf8Data}`);
+
 		} else if (message.type === 'binary') {
 			console.log('Received Binary Message of ' + message.binaryData.length + ' bytes');
-			recognizeConnections.remoteAddress.write(
-				{
-					audio_content: message.binaryData
-				}
-			);
+			// const bufferBASE64 = Buffer.from(message.binaryData);
+			// console.log(bufferBASE64.toString('base64'));
+			if (recognizeConnections) {
+				recognizeConnections.write(message.binaryData);
+			}
 		}
 	}).on('close', (reasonCode, description) => {
 		console.log((new Date()) + ' Peer ' + connection.remoteAddress + ' disconnected.');
-		recognizeConnections.remoteAddress.end();
+		if (recognizeConnections) {
+			recognizeConnections.end();
+		}
 	});
 });
