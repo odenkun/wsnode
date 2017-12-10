@@ -34,27 +34,19 @@ const requestConf = {
 		encoding: 'LINEAR16',
 		sampleRateHertz: 16000,
 		languageCode: 'ja-jp',
-	}
+	},
+	single_utterance:true,
+	interim_results:true
+	
 };
-// const request = {
-// 	config: {
-// 		encoding: 'LINEAR16',
-// 		sampleRateHertz: 16000,
-// 		languageCode: 'en-US',
-// 	},
-// 	interimResults: false, // If you want interim results, set this to true
-// };
 
-// const fs = require('fs');
-// let fileStem = fs.createReadStream('./audio.raw').on('error', console.error);
-// fileStem.pipe(recognizeConnections);
-
-let recognizeConnections;
+let connections = {};
 wsServer.on('request', (request) => {
-	if (request.remoteAddress) {
-		console.log("client created: " + request.remoteAddress);
+	const address = request.remoteAddress.toString();
+	if (address) {
+		console.log("client created: " + address);
 		const client = new speech.SpeechClient(auth);
-		recognizeConnections = client
+		connections[address] = client
 			.streamingRecognize(requestConf)
 			.on('error', error => console.log(error))
 			.on('data', data => {
@@ -69,28 +61,28 @@ wsServer.on('request', (request) => {
 	if (!originIsAllowed(request.origin)) {
 		//アクセス拒否
 		request.reject();
-		console.log((new Date()) + ' Connection from origin ' + request.origin + ' rejected.');
+		console.log((new Date()) + ' Connection from origin ' + address + ' rejected.');
 		return;
 	}
-	console.log((new Date()) + ' Connection accepted.' + request.origin);
+	console.log((new Date()) + ' Connection accepted.' + address);
 	//サブプロトコル
 	const connection = request.accept('recognize', request.origin);
 	connection.on('message', (message) => {
 		if (message.type === 'utf8') {
 			console.log(`received: ${message.utf8Data}`);
-
+			
 		} else if (message.type === 'binary') {
 			console.log('Received Binary Message of ' + message.binaryData.length + ' bytes');
 			// const bufferBASE64 = Buffer.from(message.binaryData);
 			// console.log(bufferBASE64.toString('base64'));
-			if (recognizeConnections) {
-				recognizeConnections.write(message.binaryData);
+			if (connections[address]) {
+				connections[address].write(message.binaryData);
 			}
 		}
 	}).on('close', (reasonCode, description) => {
-		console.log((new Date()) + ' Peer ' + connection.remoteAddress + ' disconnected.');
-		if (recognizeConnections) {
-			recognizeConnections.end();
+		console.log((new Date()) + ' Peer ' + address + ' disconnected.');
+		if (connections[address]) {
+			connections[address].end();
 		}
 	});
 });
