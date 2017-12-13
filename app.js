@@ -8,7 +8,8 @@ const server = http.createServer(function (request, response) {
 	response.writeHead(404);
 	response.end();
 });
-const port = 80;
+
+const port = 6001;
 server.listen(port, function () {
 	console.log((new Date()) + ' Server is listening on port ' + port);
 });
@@ -35,8 +36,8 @@ const requestConf = {
 		sampleRateHertz: 16000,
 		languageCode: 'ja-jp',
 	},
-	single_utterance:true,
-	interim_results:true
+	single_utterance: true,
+	interim_results: true
 	
 };
 
@@ -73,9 +74,10 @@ wsServer.on('request', (request) => {
 			
 		} else if (message.type === 'binary') {
 			console.log('Received Binary Message of ' + message.binaryData.length + ' bytes');
-			// const bufferBASE64 = Buffer.from(message.binaryData);
-			// console.log(bufferBASE64.toString('base64'));
+			
 			if (connections[address]) {
+				const bufferBASE64 = Buffer.from(message.binaryData);
+				console.log(bufferBASE64.toString('base64'));
 				connections[address].write(message.binaryData);
 			}
 		}
